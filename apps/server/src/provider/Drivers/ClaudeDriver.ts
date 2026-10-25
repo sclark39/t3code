@@ -52,7 +52,7 @@ import {
   makeClaudeCapabilitiesCacheKey,
   makeClaudeContinuationGroupKey,
   mergeClaudeProcessEnvironment,
-  resolveClaudeHomePath,
+  resolveClaudeConfigDirPath,
 } from "./ClaudeHome.ts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import { makeClaudeMaintenanceResolution } from "./ClaudeMaintenance.ts";
@@ -131,9 +131,13 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
       Effect.provideService(HttpClient.HttpClient, httpClient),
     );
     const continuationGroupKey = yield* makeClaudeContinuationGroupKey(effectiveConfig, processEnv);
-    const configDir = yield* resolveClaudeHomePath(effectiveConfig, processEnv);
+    // The account config (.claude.json) lives in the dir the CLI runs with, so
+    // a shadow home reads its own account, not the shared home's.
+    const configDir = yield* resolveClaudeConfigDirPath(effectiveConfig, processEnv);
     const accountConfigPath = yield* ClaudeResetCredits.claudeAccountConfigPath(
-      effectiveConfig.homePath.trim() || processEnv.CLAUDE_CONFIG_DIR?.trim()
+      effectiveConfig.homePath.trim() ||
+        effectiveConfig.shadowHomePath.trim() ||
+        processEnv.CLAUDE_CONFIG_DIR?.trim()
         ? configDir
         : undefined,
     );

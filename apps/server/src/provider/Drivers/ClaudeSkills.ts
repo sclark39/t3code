@@ -415,15 +415,18 @@ const discoverPluginSkillRoots = Effect.fn("discoverPluginSkillRoots")(function*
 });
 
 const resolveClaudeConfigDirPath = Effect.fn("resolveClaudeConfigDirPath")(function* (
-  config: Pick<ClaudeSettings, "homePath">,
+  config: Pick<ClaudeSettings, "homePath"> & Partial<Pick<ClaudeSettings, "shadowHomePath">>,
   environment: NodeJS.ProcessEnv,
   cwd?: string,
 ): Effect.fn.Return<string, never, Path.Path> {
   const path = yield* Path.Path;
   const home = yield* HostProcess.HomeDirectory;
-  const homePath = config.homePath.trim();
-  if (homePath.length > 0) {
-    return path.resolve(expandHomePath(homePath, home));
+  // Matches makeClaudeEnvironment: a shadow home is the dir the CLI runs with.
+  const configuredDir = [config.shadowHomePath?.trim() ?? "", config.homePath.trim()].find(
+    (value) => value.length > 0,
+  );
+  if (configuredDir !== undefined) {
+    return path.resolve(expandHomePath(configuredDir, home));
   }
   // Match the spawned CLI: preserve a literal ~ and resolve relative config against workspace cwd.
   const environmentConfigDir = environment.CLAUDE_CONFIG_DIR?.trim() ?? "";
@@ -494,7 +497,8 @@ export function claudeLaunchArgDirectories(launchArgs?: string): ReadonlyArray<s
 
 /** First name wins, matching Claude Code's precedence of user skills over project skills. */
 export const discoverClaudeSkills = Effect.fn("discoverClaudeSkills")(function* (
-  config: Pick<ClaudeSettings, "homePath"> & Partial<Pick<ClaudeSettings, "launchArgs">>,
+  config: Pick<ClaudeSettings, "homePath"> &
+    Partial<Pick<ClaudeSettings, "shadowHomePath" | "launchArgs">>,
   cwd?: string,
   environment?: NodeJS.ProcessEnv,
 ): Effect.fn.Return<ReadonlyArray<ServerProviderSkill>, never, FileSystem.FileSystem | Path.Path> {
