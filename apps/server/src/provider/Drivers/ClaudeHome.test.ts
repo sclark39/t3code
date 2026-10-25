@@ -9,6 +9,7 @@ import {
   makeClaudeCapabilitiesCacheKey,
   makeClaudeContinuationGroupKey,
   makeClaudeEnvironment,
+  resolveClaudeConfigDirPath,
   resolveClaudeHomePath,
 } from "./ClaudeHome.ts";
 
@@ -54,6 +55,79 @@ it.layer(NodeServices.layer)("ClaudeHome", (it) => {
         const second = yield* makeClaudeCapabilitiesCacheKey(config, "/repo-b");
         expect(first).not.toBe(second);
       }),
+    );
+  });
+
+  describe("Claude shadow home", () => {
+    it.effect("points the CLI at the shadow config dir while keying continuation on HOME", () =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const homePath = "~/.claude";
+        const shadowHomePath = "~/.claude-t3/personal";
+        const resolvedHome = path.resolve(NodeOS.homedir(), ".claude");
+        const resolvedShadow = path.resolve(NodeOS.homedir(), ".claude-t3", "personal");
+
+        expect(yield* resolveClaudeConfigDirPath({ homePath, shadowHomePath })).toBe(
+          resolvedShadow,
+        );
+        expect((yield* makeClaudeEnvironment({ homePath, shadowHomePath })).CLAUDE_CONFIG_DIR).toBe(
+          resolvedShadow,
+        );
+        expect(yield* makeClaudeContinuationGroupKey({ homePath, shadowHomePath })).toBe(
+          `claude:home:${resolvedHome}`,
+        );
+      }),
+    );
+
+    it.effect("sets CLAUDE_CONFIG_DIR from the shadow home even without a HOME override", () =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const shadowHomePath = "~/.claude-t3/personal";
+        const resolvedShadow = path.resolve(NodeOS.homedir(), ".claude-t3", "personal");
+
+        expect(
+          (yield* makeClaudeEnvironment({ homePath: "", shadowHomePath })).CLAUDE_CONFIG_DIR,
+        ).toBe(resolvedShadow);
+      }),
+    );
+
+    it.effect("shadow home wins over an inherited CLAUDE_CONFIG_DIR", () =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const inherited = path.resolve("/tmp/claude-inherited");
+        const environment = { CLAUDE_CONFIG_DIR: inherited };
+        const shadowHomePath = "~/.claude-t3/personal";
+        const resolvedShadow = path.resolve(NodeOS.homedir(), ".claude-t3", "personal");
+
+        expect(
+          yield* resolveClaudeConfigDirPath({ homePath: "", shadowHomePath }, environment),
+        ).toBe(resolvedShadow);
+        // Continuation still follows the shared home, which here is inherited.
+        expect(
+          yield* makeClaudeContinuationGroupKey({ homePath: "", shadowHomePath }, environment),
+        ).toBe(`claude:home:${inherited}`);
+      }),
+    );
+
+    it.effect(
+      "keeps continuation compatible while separating capability probes across shadow homes",
+      () =>
+        Effect.gen(function* () {
+          const homePath = "~/.claude";
+          const first = { binaryPath: "claude", homePath, shadowHomePath: "~/.claude-t3/work" };
+          const second = {
+            binaryPath: "claude",
+            homePath,
+            shadowHomePath: "~/.claude-t3/personal",
+          };
+
+          expect(yield* makeClaudeContinuationGroupKey(first)).toBe(
+            yield* makeClaudeContinuationGroupKey(second),
+          );
+          expect(yield* makeClaudeCapabilitiesCacheKey(first)).not.toBe(
+            yield* makeClaudeCapabilitiesCacheKey(second),
+          );
+        }),
     );
   });
 });

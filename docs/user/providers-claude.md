@@ -19,20 +19,54 @@ CLAUDE_CONFIG_DIR=~/.claude_personal claude auth login
 
 Add another Claude instance in **Settings > Providers**:
 
-| Instance        | Binary path | CLAUDE_CONFIG_DIR path |
-| --------------- | ----------- | ---------------------- |
-| Claude Work     | `claude`    | Leave empty            |
-| Claude Personal | `claude`    | `~/.claude_personal`   |
+| Instance        | Binary path | CLAUDE_CONFIG_DIR path | Shadow home path     |
+| --------------- | ----------- | ---------------------- | -------------------- |
+| Claude Work     | `claude`    | Leave empty            | Leave empty          |
+| Claude Personal | `claude`    | Leave empty            | `~/.claude_personal` |
 
-An empty config-directory setting uses Claude Code's normal configuration. The
-custom setting changes `CLAUDE_CONFIG_DIR`, leaving `HOME` and the system keychain
-location intact. Use the same variable for the login command. Setting `HOME`
-instead can put credentials where this provider will not find them.
+An empty config-directory setting uses Claude Code's normal configuration. Both
+settings change `CLAUDE_CONFIG_DIR` for the spawned CLI, leaving `HOME` and the
+system keychain location intact. Use the same variable for the login command.
+Setting `HOME` instead can put credentials where this provider will not find them.
 
-Check the account reported in provider settings after signing in. Existing
-threads can switch only between Claude instances with the same config directory.
-Separate account directories stay isolated, including their local conversation
-state. Claude does not have Codex's shared-home and shadow-home arrangement.
+The two fields play different roles. **CLAUDE_CONFIG_DIR path** is the shared home
+and decides which instances count as the same Claude environment; **Shadow home
+path** is the directory the CLI actually runs with, holding that account's
+private files (`.credentials.json` and `.claude.json`). Instances with the same
+`CLAUDE_CONFIG_DIR path` are compatible for continuation, so an existing thread
+can switch between Claude Work and Claude Personal and resume natively under the
+other account.
+
+T3 Code does not yet link shared state into a Claude shadow home for you. Link
+the shared directories back to the shared config dir so both accounts see the
+same sessions, skills, and settings — the `projects` link is what makes
+continuation work, since Claude Code sessions are local transcript files there:
+
+```bash
+# macOS / Linux
+ln -s ~/.claude/projects ~/.claude_personal/projects
+ln -s ~/.claude/skills   ~/.claude_personal/skills
+ln -s ~/.claude/plugins  ~/.claude_personal/plugins
+ln -s ~/.claude/settings.json ~/.claude_personal/settings.json
+```
+
+```text
+:: Windows (no admin needed for directory junctions)
+mklink /J %USERPROFILE%\.claude_personal\projects %USERPROFILE%\.claude\projects
+mklink /J %USERPROFILE%\.claude_personal\skills   %USERPROFILE%\.claude\skills
+mklink /J %USERPROFILE%\.claude_personal\plugins  %USERPROFILE%\.claude\plugins
+mklink %USERPROFILE%\.claude_personal\settings.json %USERPROFILE%\.claude\settings.json
+```
+
+Never link `.credentials.json` or `.claude.json` — separate credentials are the
+point. If you instead put the account directory in **CLAUDE_CONFIG_DIR path** with
+no shadow home, that instance stays a separate Claude environment, isolated
+including its local conversation state, and the picker will not offer it for an
+existing thread.
+
+Check the account reported in provider settings after signing in. The first turn
+after switching accounts re-warms the prompt cache, so it can cost more and start
+slower than a normal turn.
 
 For presets that differ only in API keys or endpoints, use the instance's
 **Environment variables**. Variable assignments do not belong in **Launch arguments**.

@@ -141,6 +141,7 @@ import { signalProcessGroup } from "@t3tools/provider-core/server/processGroup";
 import {
   claudeSignedOutMessage,
   makeClaudeEnvironment,
+  resolveClaudeConfigDirPath,
   resolveClaudeHomePath,
 } from "../../provider/Drivers/ClaudeHome.ts";
 import {
@@ -3912,13 +3913,16 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
   const continuationRequests = adapterOptions.continuationRequests ?? {
     offer: () => Effect.void,
   };
-  const homePath = yield* resolveClaudeHomePath(
+  // Settings files are read from the dir the CLI runs with, so a shadow home
+  // sees its own account's remote-settings rather than the shared home's.
+  const homePath = yield* resolveClaudeConfigDirPath(
     adapterOptions.settings,
     adapterOptions.environment,
   ).pipe(Effect.provideService(Path.Path, path));
   const hostEnvironment = yield* HostProcess.Environment;
   const customHome =
     adapterOptions.settings.homePath.trim().length > 0 ||
+    adapterOptions.settings.shadowHomePath.trim().length > 0 ||
     adapterOptions.environment.CLAUDE_CONFIG_DIR !== hostEnvironment.CLAUDE_CONFIG_DIR;
   const announcedBypassDowngrades = new Set<ThreadId>();
   const readBypassSettings = (filePath: string) =>

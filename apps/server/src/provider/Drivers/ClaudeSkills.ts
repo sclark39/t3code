@@ -414,15 +414,18 @@ const discoverPluginSkillRoots = Effect.fn("discoverPluginSkillRoots")(function*
 });
 
 const resolveClaudeConfigDirPath = Effect.fn("resolveClaudeConfigDirPath")(function* (
-  config: Pick<ClaudeSettings, "homePath">,
+  config: Pick<ClaudeSettings, "homePath"> & Partial<Pick<ClaudeSettings, "shadowHomePath">>,
   environment: NodeJS.ProcessEnv,
   cwd?: string,
 ): Effect.fn.Return<string, never, Path.Path> {
   const path = yield* Path.Path;
   const home = yield* HostProcess.HomeDirectory;
-  const homePath = config.homePath.trim();
-  if (homePath.length > 0) {
-    return path.resolve(expandHomePath(homePath, home));
+  // Matches makeClaudeEnvironment: a shadow home is the dir the CLI runs with.
+  const configuredDir = [config.shadowHomePath?.trim() ?? "", config.homePath.trim()].find(
+    (value) => value.length > 0,
+  );
+  if (configuredDir !== undefined) {
+    return path.resolve(expandHomePath(configuredDir, home));
   }
   // No tilde expansion here: the spawned CLI receives this env var verbatim
   // (env vars are never shell-expanded), so a literal `~` must stay literal
@@ -442,7 +445,8 @@ const resolveClaudeConfigDirPath = Effect.fn("resolveClaudeConfigDirPath")(funct
  * both scopes, the user copy is the one that runs.
  */
 export const discoverClaudeSkills = Effect.fn("discoverClaudeSkills")(function* (
-  config: Pick<ClaudeSettings, "homePath"> & Partial<Pick<ClaudeSettings, "launchArgs">>,
+  config: Pick<ClaudeSettings, "homePath"> &
+    Partial<Pick<ClaudeSettings, "shadowHomePath" | "launchArgs">>,
   cwd?: string,
   environment?: NodeJS.ProcessEnv,
 ): Effect.fn.Return<ReadonlyArray<ServerProviderSkill>, never, FileSystem.FileSystem | Path.Path> {

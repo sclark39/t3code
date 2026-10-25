@@ -550,6 +550,24 @@ it.layer(NodeServices.layer)("discoverClaudeSkills", (it) => {
         explicitSkills.map((skill) => skill.name),
         ["explicit-skill"],
       );
+
+      // A shadow home wins over homePath, matching makeClaudeEnvironment
+      // which points CLAUDE_CONFIG_DIR at the shadow config dir.
+      const shadowHome = path.join(tempDir, "shadow-home");
+      yield* writeSkill(
+        path.join(shadowHome, "skills"),
+        "shadow-skill",
+        ["---", "name: shadow-skill", "---"].join("\n"),
+      );
+      const shadowSkills = yield* discoverClaudeSkills(
+        { homePath: explicitHome, shadowHomePath: shadowHome },
+        undefined,
+        { CLAUDE_CONFIG_DIR: environmentConfigDir },
+      );
+      assert.deepEqual(
+        shadowSkills.map((skill) => skill.name),
+        ["shadow-skill"],
+      );
     }),
   );
 
