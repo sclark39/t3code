@@ -12,6 +12,13 @@ import { readClaudeSettingsEnv } from "./ClaudeSkills.ts";
 
 const quotePath = Schema.encodeSync(Schema.fromJsonString(Schema.String));
 
+/**
+ * Config accepted by the home helpers. `shadowHomePath` is optional so callers
+ * that only know the shared home keep working unchanged.
+ */
+export type ClaudeHomeConfig = Pick<ClaudeSettings, "homePath"> &
+  Partial<Pick<ClaudeSettings, "shadowHomePath">>;
+
 export const resolveClaudeHomePath = Effect.fn("resolveClaudeHomePath")(function* (
   config: Pick<ClaudeSettings, "homePath">,
   environment?: NodeJS.ProcessEnv,
@@ -30,18 +37,37 @@ export const resolveClaudeHomePath = Effect.fn("resolveClaudeHomePath")(function
   return path.resolve(path.join(home, ".claude"));
 });
 
+/**
+ * The config dir the spawned CLI sees: the shadow home (private credentials and
+ * .claude.json) when set. Continuation identity stays keyed on the shared home,
+ * which the shadow dir is expected to link its projects/skills/settings back to.
+ */
+export const resolveClaudeConfigDirPath = Effect.fn("resolveClaudeConfigDirPath")(function* (
+  config: ClaudeHomeConfig,
+  environment?: NodeJS.ProcessEnv,
+): Effect.fn.Return<string, never, Path.Path> {
+  const path = yield* Path.Path;
+  const shadowHomePath = config.shadowHomePath?.trim() ?? "";
+  if (shadowHomePath.length > 0) {
+    const home = yield* HostProcess.HomeDirectory;
+    return path.resolve(expandHomePath(shadowHomePath, home));
+  }
+  return yield* resolveClaudeHomePath(config, environment);
+});
+
 export const makeClaudeEnvironment = Effect.fn("makeClaudeEnvironment")(function* (
-  config: Pick<ClaudeSettings, "homePath">,
+  config: ClaudeHomeConfig,
   baseEnv?: NodeJS.ProcessEnv,
 ): Effect.fn.Return<NodeJS.ProcessEnv, never, Path.Path> {
   const resolvedBaseEnv = baseEnv ?? process.env;
   const homePath = config.homePath.trim();
-  if (homePath.length === 0) return resolvedBaseEnv;
-  const resolvedHomePath = yield* resolveClaudeHomePath(config);
+  const shadowHomePath = config.shadowHomePath?.trim() ?? "";
+  if (homePath.length === 0 && shadowHomePath.length === 0) return resolvedBaseEnv;
+  const resolvedConfigDir = yield* resolveClaudeConfigDirPath(config);
   return {
     ...resolvedBaseEnv,
     // Changing HOME hides macOS Keychain credentials; use CLAUDE_CONFIG_DIR to keep login access.
-    CLAUDE_CONFIG_DIR: resolvedHomePath,
+    CLAUDE_CONFIG_DIR: resolvedConfigDir,
   };
 });
 
@@ -102,7 +128,9 @@ export const hasClaudeManagedMcpConfig = Effect.fn("hasClaudeManagedMcpConfig")(
 
 export const makeClaudeContinuationGroupKey = Effect.fn("makeClaudeContinuationGroupKey")(
   function* (
-    config: Pick<ClaudeSettings, "homePath">,
+    // Accepts (and deliberately ignores) a shadow home: continuation identity
+    // follows the shared home so shadow instances stay compatible.
+    config: ClaudeHomeConfig,
     environment?: NodeJS.ProcessEnv,
   ): Effect.fn.Return<string, never, Path.Path> {
     const resolvedHomePath = yield* resolveClaudeHomePath(config, environment);
@@ -112,12 +140,15 @@ export const makeClaudeContinuationGroupKey = Effect.fn("makeClaudeContinuationG
 
 export const makeClaudeCapabilitiesCacheKey = Effect.fn("makeClaudeCapabilitiesCacheKey")(
   function* (
-    config: Pick<ClaudeSettings, "binaryPath" | "homePath">,
+    config: Pick<ClaudeSettings, "binaryPath"> & ClaudeHomeConfig,
     cwd?: string,
     environment?: NodeJS.ProcessEnv,
   ): Effect.fn.Return<string, never, Path.Path> {
-    const resolvedHomePath = yield* resolveClaudeHomePath(config, environment);
-    return `${config.binaryPath}\0${resolvedHomePath}\0${cwd ?? ""}`;
+    // Keyed on the effective config dir (shadow-aware) so account-specific
+    // probes never share auth metadata across instances of one continuation
+    // group.
+    const resolvedConfigDir = yield* resolveClaudeConfigDirPath(config, environment);
+    return `${config.binaryPath}\0${resolvedConfigDir}\0${cwd ?? ""}`;
   },
 );
 
