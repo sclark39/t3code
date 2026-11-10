@@ -226,6 +226,7 @@ import { cn, isMacPlatform, randomUUID } from "~/lib/utils";
 import {
   getComposerPromptLengthValidationMessage,
   getComposerSubmissionValidationMessage,
+  isBlankComposerSubmission,
   submitComposerDraft,
 } from "./composerSubmission";
 import { ComposerPromptLengthValidation } from "./ComposerPromptLengthValidation";
@@ -491,6 +492,8 @@ export interface ChatComposerProps {
     dispatchMode?: ComposerDispatchMode,
     submissionIntent?: ComposerSubmissionIntent,
   ) => void;
+  /** Submit with nothing to send. Returns true when the submission was handled. */
+  onSubmitBlank?: () => boolean;
   onResume: () => void;
   onInterrupt: () => void;
   onImplementPlanInNewThread: () => void;
@@ -614,6 +617,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     onPageScrollRelease,
     onCompactContext,
     onSend,
+    onSubmitBlank,
     onResume,
     onInterrupt,
     onImplementPlanInNewThread,
@@ -2116,6 +2120,18 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       noProviderAvailable ||
       isSendDisabled ||
       !readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)
+    ) {
+      event?.preventDefault();
+      return;
+    }
+    if (
+      isBlankComposerSubmission({
+        prompt: promptRef.current,
+        hasSendableContent: composerSendState.hasSendableContent,
+        answeringPendingUserInput: activePendingProgress !== null,
+        editingQueuedMessage: isEditingQueuedMessage,
+      }) &&
+      onSubmitBlank?.() === true
     ) {
       event?.preventDefault();
       return;

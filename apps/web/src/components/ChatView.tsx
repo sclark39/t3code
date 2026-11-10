@@ -2950,6 +2950,11 @@ export default function ChatView(props: ChatViewProps) {
   };
   const sendPreviewAnnotationStable = useStableCallback(sendPreviewAnnotation);
   const onComposerResumeStable = useStableCallback(onResume);
+  // Enter on an empty composer sends the oldest queued message, like the
+  // steer shortcut, so a queued follow-up can be released without retyping it.
+  const onComposerSubmitBlankStable = useStableCallback(
+    () => routeKind !== "draft" && queuedRunsControlRef.current?.steerNext(false) === true,
+  );
   const onComposerCompactContextStable = useStableCallback(onCompactContext);
   const queuedRunsControl =
     isServerThread && activeThread ? (
@@ -3604,6 +3609,7 @@ export default function ChatView(props: ChatViewProps) {
                               onPageScrollRelease={onComposerPageScrollReleaseStable}
                               onCompactContext={onComposerCompactContextStable}
                               onSend={onComposerSendStable}
+                              onSubmitBlank={onComposerSubmitBlankStable}
                               onResume={onComposerResumeStable}
                               onInterrupt={onInterruptStable}
                               onImplementPlanInNewThread={onImplementPlanInNewThreadStable}
