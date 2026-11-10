@@ -78,6 +78,8 @@ the oldest queued message as a steer. This leaves the current draft intact and
 requires an active turn that supports steering. If that shortcut sends the opposite
 action for your draft, move focus outside the composer to steer the queued message. Change
 `thread.steerQueuedMessage` in **Settings → Keybindings** to use another shortcut.
+Pressing Enter in an empty composer does the same: it sends the oldest queued
+message as a steer, or starts a turn with it when nothing is running.
 
 Press `Option+Up` on macOS or `Alt+Up` on Windows and Linux with the cursor at the
 start of the composer to edit the most recently queued message. Change
@@ -129,8 +131,8 @@ Leaving reasoning level or service tier unset uses the provider's own configurat
 ## Quote an assistant response
 
 On web and desktop, select text within one assistant response and choose
-**Cite in composer**. You can add a comment about the quote and write instructions
-around it.
+**Cite in composer**. The chip lands on its own line with the caret below it, so you
+can add a comment about the quote and write instructions under it.
 
 Select the quote in a draft or sent message to return to its source. If the source
 is unavailable or has changed, the saved quote remains readable.
