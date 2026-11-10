@@ -505,6 +505,9 @@ export function useSettingsRestore(onRestored?: () => void) {
     ...(settings.addProjectBaseDirectory !== DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory
       ? ["Add project base directory"]
       : []),
+    ...(settings.newProjectsRoot !== DEFAULT_UNIFIED_SETTINGS.newProjectsRoot
+      ? ["New projects folder"]
+      : []),
     ...(settings.confirmThreadUnpin !== DEFAULT_UNIFIED_SETTINGS.confirmThreadUnpin
       ? ["Unpin confirmation"]
       : []),
@@ -620,6 +623,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       defaultThreadEnvMode: DEFAULT_UNIFIED_SETTINGS.defaultThreadEnvMode,
       newWorktreesStartFromOrigin: DEFAULT_UNIFIED_SETTINGS.newWorktreesStartFromOrigin,
       addProjectBaseDirectory: DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory,
+      newProjectsRoot: DEFAULT_UNIFIED_SETTINGS.newProjectsRoot,
       confirmThreadArchive: DEFAULT_UNIFIED_SETTINGS.confirmThreadArchive,
       confirmThreadDelete: DEFAULT_UNIFIED_SETTINGS.confirmThreadDelete,
       confirmThreadUnpin: DEFAULT_UNIFIED_SETTINGS.confirmThreadUnpin,
@@ -855,6 +859,7 @@ export function GeneralSettingsPanel() {
     textGenerationModelInstanceEntries,
   );
   const mixedAddProjectBaseDirectory = useScopedSettingsMixed(["addProjectBaseDirectory"]);
+  const mixedNewProjectsRoot = useScopedSettingsMixed(["newProjectsRoot"]);
   const mixedTextGenerationModel = useScopedSettingsMixed(["textGenerationModelSelection"]);
 
   return (
@@ -1675,6 +1680,33 @@ export function GeneralSettingsPanel() {
               placeholder={mixedAddProjectBaseDirectory ? "Mixed" : "~/"}
               spellCheck={false}
               aria-label="Add project base directory"
+            />
+          }
+        />
+        <SettingsRow
+          serverScoped
+          settingKeys={["newProjectsRoot"]}
+          {...searchableSetting("new-projects-folder")}
+          description='Where "New project" creates its folder. Leave empty to use the projects folder inside the T3 data directory. "~" means your home directory.'
+          resetAction={
+            settings.newProjectsRoot !== DEFAULT_UNIFIED_SETTINGS.newProjectsRoot ? (
+              <SettingResetButton
+                label="new projects folder"
+                onClick={() =>
+                  updateSettings({ newProjectsRoot: DEFAULT_UNIFIED_SETTINGS.newProjectsRoot })
+                }
+              />
+            ) : null
+          }
+          control={
+            <DraftInput
+              size="sm"
+              className="w-full sm:w-72"
+              value={mixedNewProjectsRoot ? "" : settings.newProjectsRoot}
+              onCommit={(next) => updateSettings({ newProjectsRoot: next })}
+              placeholder={mixedNewProjectsRoot ? "Mixed" : "Default"}
+              spellCheck={false}
+              aria-label="New projects folder"
             />
           }
         />

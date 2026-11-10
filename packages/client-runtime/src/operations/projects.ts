@@ -193,6 +193,23 @@ export function getNewProjectPathPreview(newProjectsRoot: string, name: string):
   return getCloneDestinationPath(newProjectsRoot, newProjectFolderName(name));
 }
 
+/**
+ * Where "New project" creates its folder on an environment, or null when the
+ * server cannot create named projects. The config snapshot carries the root
+ * resolved at connect; the `newProjectsRoot` setting is layered on top so the
+ * value follows a change on the settings page without a reconnect.
+ */
+export function resolveNewProjectsRoot(
+  config: Pick<ServerConfig, "newProjectsRoot" | "settings"> | null | undefined,
+): string | null {
+  if (config === null || config === undefined || config.newProjectsRoot === undefined) {
+    return null;
+  }
+  const defaultRoot = config.newProjectsRoot;
+  const setting = config.settings.newProjectsRoot?.trim() ?? "";
+  return setting.length > 0 ? setting : defaultRoot;
+}
+
 export interface NewProjectPublishTarget {
   readonly definition: SourceControlClientDefinition;
   readonly owner: string | null;

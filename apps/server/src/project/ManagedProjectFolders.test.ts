@@ -56,6 +56,7 @@ interface HarnessOptions {
   readonly projects?: (
     real: ProjectService.ProjectService["Service"],
   ) => ProjectService.ProjectService["Service"];
+  readonly settings?: Parameters<typeof ServerSettings.layerTest>[0];
 }
 
 const layer = (baseDir: string, options?: HarnessOptions) =>
@@ -74,7 +75,7 @@ const layer = (baseDir: string, options?: HarnessOptions) =>
     Layer.provideMerge(layerGitWorkflow(options?.vcsProcess)),
     Layer.provideMerge(options?.git ?? layerRealGit),
     Layer.provideMerge(SqlitePersistence.layerMemory),
-    Layer.provideMerge(ServerSettings.layerTest()),
+    Layer.provideMerge(ServerSettings.layerTest(options?.settings)),
     Layer.provideMerge(ServerConfig.layerTest(baseDir, baseDir)),
     Layer.provideMerge(NodeServices.layer),
   );
@@ -532,4 +533,48 @@ it.effect("removes the folder when the create is cancelled before the project ex
       },
     );
   }),
+);
+
+it.effect("puts named projects in the folder from the newProjectsRoot setting", () =>
+  Effect.gen(function* () {
+    const fileSystem = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const customRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3-custom-root-" });
+    yield* withScratch(
+      ({ baseDir }) =>
+        withGitEnv(
+          TEST_IDENTITY,
+          Effect.gen(function* () {
+            const folders = yield* ManagedProjectFolders.ManagedProjectFolders;
+            assert.equal(folders.namedProjectsRoot, path.resolve(baseDir, "projects"));
+            assert.equal(yield* folders.resolveNamedProjectsRoot, path.resolve(customRoot));
+
+            const created = yield* folders.createNamedProject({ name: "Elsewhere" });
+            assert.equal(created.workspaceRoot, path.join(path.resolve(customRoot), "elsewhere"));
+            assert.isTrue(yield* fileSystem.exists(path.join(created.workspaceRoot, "README.md")));
+            assert.isFalse(yield* fileSystem.exists(path.resolve(baseDir, "projects")));
+          }),
+        ),
+      { settings: { newProjectsRoot: customRoot } },
+    );
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
+it.effect("resolves the newProjectsRoot setting against the default and the home directory", () =>
+  Effect.gen(function* () {
+    const path = yield* Path.Path;
+    const resolve = (setting: string) =>
+      ManagedProjectFolders.resolveNewProjectsRoot({
+        setting,
+        defaultRoot: path.resolve("data", "projects"),
+        homeDirectory: path.resolve("home"),
+        path,
+      });
+    assert.equal(resolve(""), path.resolve("data", "projects"));
+    assert.equal(resolve("   "), path.resolve("data", "projects"));
+    assert.equal(resolve("~"), path.resolve("home"));
+    assert.equal(resolve("~/Code"), path.resolve("home", "Code"));
+    assert.equal(resolve(" ~/Code/ "), path.resolve("home", "Code"));
+    assert.equal(resolve(path.resolve("abs", "root")), path.resolve("abs", "root"));
+  }).pipe(Effect.provide(NodeServices.layer)),
 );

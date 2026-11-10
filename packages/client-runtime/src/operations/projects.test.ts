@@ -1,4 +1,8 @@
-import { SourceControlProviderKind } from "@t3tools/contracts";
+import {
+  DEFAULT_SERVER_SETTINGS,
+  SourceControlProviderKind,
+  type ServerConfig,
+} from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 import { EnvironmentId, ProjectId } from "@t3tools/contracts";
 
@@ -7,6 +11,7 @@ import {
   getCloneDirectoryName,
   getDefaultCloneUrl,
   normalizePastedCloneUrl,
+  resolveNewProjectsRoot,
 } from "./projects.ts";
 import type { EnvironmentProject } from "../state/models.ts";
 
@@ -100,5 +105,32 @@ describe("add project shared logic", () => {
     expect(findExistingAddProject({ projects, environmentId: env, path: "/repo" })?.id).toBe(
       "project",
     );
+  });
+});
+
+describe("resolveNewProjectsRoot", () => {
+  const config = (newProjectsRoot: string | undefined, setting: string | undefined) =>
+    ({
+      ...(newProjectsRoot === undefined ? {} : { newProjectsRoot }),
+      settings: {
+        ...DEFAULT_SERVER_SETTINGS,
+        ...(setting === undefined ? {} : { newProjectsRoot: setting }),
+      },
+    }) as Pick<ServerConfig, "newProjectsRoot" | "settings">;
+
+  it("is null without a config or when the server cannot create named projects", () => {
+    expect(resolveNewProjectsRoot(null)).toBeNull();
+    expect(resolveNewProjectsRoot(undefined)).toBeNull();
+    expect(resolveNewProjectsRoot(config(undefined, "/elsewhere"))).toBeNull();
+  });
+
+  it("uses the server default when the setting is empty", () => {
+    expect(resolveNewProjectsRoot(config("/data/projects", ""))).toBe("/data/projects");
+    expect(resolveNewProjectsRoot(config("/data/projects", "   "))).toBe("/data/projects");
+  });
+
+  it("prefers the setting so a change on the settings page shows before reconnect", () => {
+    expect(resolveNewProjectsRoot(config("/data/projects", "/srv/projects"))).toBe("/srv/projects");
+    expect(resolveNewProjectsRoot(config("/data/projects", " ~/Code "))).toBe("~/Code");
   });
 });
