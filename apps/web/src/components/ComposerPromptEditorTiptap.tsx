@@ -193,6 +193,7 @@ export type ComposerCitationCommentRequest = {
   insertedSpaces: CitationInsertedSpaces;
 };
 
+/** `after` is the line break the cite action adds behind the chip, not a space. */
 type CitationInsertedSpaces = { before: boolean; after: boolean };
 
 type OpenCitationComment = {
@@ -438,7 +439,18 @@ function ComposerCitationNodeView({ node, editor, getPos }: NodeViewProps) {
     if (!current) return;
     const end = pos + current.nodeSize;
     const from = removeOnCancel.before && doc.textBetween(pos - 1, pos) === " " ? pos - 1 : pos;
-    const to = removeOnCancel.after && doc.textBetween(end, end + 1) === " " ? end + 1 : end;
+    // The chip closes its paragraph; deleting into the start of the next one
+    // joins the two, which takes the inserted line break back out.
+    const $end = doc.resolve(end);
+    const breakFollows =
+      $end.parentOffset === $end.parent.content.size && $end.after() < doc.content.size;
+    const to = removeOnCancel.after
+      ? breakFollows
+        ? $end.after() + 1
+        : doc.textBetween(end, end + 1) === " "
+          ? end + 1
+          : end
+      : end;
     editor.chain().focus().deleteRange({ from, to }).run();
   };
 

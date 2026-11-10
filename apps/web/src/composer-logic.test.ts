@@ -88,9 +88,13 @@ describe("formatAssistantCitationForComposer", () => {
     const comment = 'What does "keep" mean? 👋\n  Please show an example.';
     const text = formatAssistantCitationForComposer(citation, `  ${comment}\n`);
     const boundCitation = { ...citation, comment };
-    expect(text).toBe(`${serializeAssistantCitation(boundCitation)} `);
+    expect(text).toBe(`${serializeAssistantCitation(boundCitation)}\n`);
     expect(collectAssistantCitations(text).map((entry) => entry.citation)).toEqual([boundCitation]);
-    expect(expandAssistantCitationsForProvider(text)).toMatch(/^\[assistant-quote-1\] \n\n/);
+    expect(expandAssistantCitationsForProvider(text)).toMatch(/^\[assistant-quote-1\]\n\n\n/);
+  });
+
+  it("puts the chip on its own line so instructions start below it", () => {
+    expect(formatAssistantCitationForComposer(citation)).toMatch(/[^\s]\n$/);
   });
 });
 
@@ -571,5 +575,11 @@ describe("extendReplacementRangeForTrailingSpace", () => {
     expect(extendReplacementRangeForTrailingSpace("@firest", 3, "@file ")).toBe(3);
     expect(extendReplacementRangeForTrailingSpace("@fi rest", 3, "@file")).toBe(3);
     expect(extendReplacementRangeForTrailingSpace("@fi", 3, "@file ")).toBe(3);
+  });
+
+  it("swallows one existing line break when the replacement ends with one", () => {
+    expect(extendReplacementRangeForTrailingSpace("see\nrest", 3, "chip\n")).toBe(4);
+    expect(extendReplacementRangeForTrailingSpace("see rest", 3, "chip\n")).toBe(3);
+    expect(extendReplacementRangeForTrailingSpace("see\nrest", 3, "chip ")).toBe(3);
   });
 });

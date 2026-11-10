@@ -4,7 +4,7 @@ import {
   withAssistantCitationComment,
 } from "@t3tools/shared/assistantCitations";
 import { createRef, useState } from "react";
-import { expect, it } from "vite-plus/test";
+import { expect, it, vi } from "vite-plus/test";
 
 import { page, userEvent } from "vite-plus/test/browser";
 
@@ -28,11 +28,13 @@ const promptBefore = `See ${serializeAssistantCitation(citation)} `;
 function Composer({
   question,
   editorRef,
+  initialPrompt = promptBefore,
 }: {
   question: boolean;
   editorRef: React.RefObject<ComposerPromptEditorHandle | null>;
+  initialPrompt?: string;
 }) {
-  const [prompt, setPrompt] = useState(promptBefore);
+  const [prompt, setPrompt] = useState(initialPrompt);
   const [answer, setAnswer] = useState("");
   return (
     <>
@@ -93,4 +95,31 @@ it("keeps an unsaved citation comment when a question takes the composer", async
     `See ${serializeAssistantCitation(withAssistantCitationComment(citation, "check this"))} `,
   );
   await expect.element(page.getByLabelText("Edit citation comment")).toBeInTheDocument();
+});
+
+it("cancelling a fresh citation removes the chip and the line break behind it", async () => {
+  const editorRef = createRef<ComposerPromptEditorHandle>();
+  const promptWithBreak = `See ${serializeAssistantCitation(citation)}\nmore`;
+  await using screen = await render(
+    <Composer question={false} editorRef={editorRef} initialPrompt={promptWithBreak} />,
+  );
+  const drafts = () => screen.container.querySelector("output")?.dataset;
+
+  const sourceAnchor = findAssistantCitationSourceAnchor(document, citation);
+  if (!sourceAnchor) throw new Error("Citation source did not resolve");
+  await act(async () =>
+    editorRef.current?.requestCitationComment({
+      previousValue: "See more",
+      value: promptWithBreak,
+      citationStart: "See ".length,
+      sourceAnchor,
+      insertedSpaces: { before: false, after: true },
+    }),
+  );
+  const comment = page.getByLabelText("Comment on selected text");
+  await expect.element(comment).toBeVisible();
+  await comment.click();
+  await userEvent.keyboard("{Escape}");
+
+  await vi.waitFor(() => expect(drafts()?.prompt).toBe("See more"));
 });
