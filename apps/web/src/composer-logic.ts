@@ -42,8 +42,12 @@ export function isPathSuggestionCurrent(
   );
 }
 
+/**
+ * The chip takes its own line so the instructions about the quote start on the
+ * line below it instead of running on after the chip.
+ */
 export function formatAssistantCitationForComposer(citation: AssistantCitation, comment = "") {
-  return `${serializeAssistantCitation(withAssistantCitationComment(citation, comment))} `;
+  return `${serializeAssistantCitation(withAssistantCitationComment(citation, comment))}\n`;
 }
 
 export function composerRequiresModifier(
@@ -320,17 +324,19 @@ export function composerStateAtPromptEnd(
 
 /**
  * A replacement ending in a space swallows one space already after the range, so inserting
- * `@file ` before existing text does not leave a double space.
+ * `@file ` before existing text does not leave a double space. The same goes for a
+ * replacement ending in a newline, such as a citation chip, and an existing line break.
  */
 export function extendReplacementRangeForTrailingSpace(
   text: string,
   rangeEnd: number,
   replacement: string,
 ): number {
-  if (!replacement.endsWith(" ")) {
+  const trailing = replacement.at(-1);
+  if (trailing !== " " && trailing !== "\n") {
     return rangeEnd;
   }
-  return text[rangeEnd] === " " ? rangeEnd + 1 : rangeEnd;
+  return text[rangeEnd] === trailing ? rangeEnd + 1 : rangeEnd;
 }
 
 export { replaceTextRange } from "@t3tools/shared/composerTrigger";
