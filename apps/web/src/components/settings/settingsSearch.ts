@@ -794,6 +794,13 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["ghq clone destination host owner repository root layout"],
   },
   {
+    id: "new-projects-folder",
+    title: "New projects folder",
+    to: "/settings/general",
+    scope: "environment-defaults",
+    searchTerms: ["new project root directory location path create goes in"],
+  },
+  {
     id: "unpin-confirmation",
     title: "Unpin confirmation",
     to: "/settings/general",
