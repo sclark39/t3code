@@ -563,6 +563,9 @@ export function useSettingsRestore(onRestored?: () => void) {
     ...(settings.ghqCloneLayout !== DEFAULT_UNIFIED_SETTINGS.ghqCloneLayout
       ? ["Clone into host folders"]
       : []),
+    ...(settings.newProjectsRoot !== DEFAULT_UNIFIED_SETTINGS.newProjectsRoot
+      ? ["New projects folder"]
+      : []),
     ...(settings.confirmThreadUnpin !== DEFAULT_UNIFIED_SETTINGS.confirmThreadUnpin
       ? ["Unpin confirmation"]
       : []),
@@ -677,6 +680,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       newWorktreesStartFromOrigin: DEFAULT_UNIFIED_SETTINGS.newWorktreesStartFromOrigin,
       addProjectBaseDirectory: DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory,
       ghqCloneLayout: DEFAULT_UNIFIED_SETTINGS.ghqCloneLayout,
+      newProjectsRoot: DEFAULT_UNIFIED_SETTINGS.newProjectsRoot,
       confirmThreadArchive: DEFAULT_UNIFIED_SETTINGS.confirmThreadArchive,
       confirmThreadDelete: DEFAULT_UNIFIED_SETTINGS.confirmThreadDelete,
       confirmThreadUnpin: DEFAULT_UNIFIED_SETTINGS.confirmThreadUnpin,
@@ -1579,6 +1583,7 @@ export function ThreadsSettingsPanel() {
     textGenerationModelInstanceEntries,
   );
   const mixedAddProjectBaseDirectory = useScopedSettingsMixed(["addProjectBaseDirectory"]);
+  const mixedNewProjectsRoot = useScopedSettingsMixed(["newProjectsRoot"]);
   const mixedTextGenerationModel = useScopedSettingsMixed(["textGenerationModelSelection"]);
 
   return (
@@ -1636,6 +1641,33 @@ export function ThreadsSettingsPanel() {
               checked={settings.ghqCloneLayout}
               onCheckedChange={(checked) => updateSettings({ ghqCloneLayout: Boolean(checked) })}
               aria-label="Clone into host folders"
+            />
+          }
+        />
+        <SettingsRow
+          serverScoped
+          settingKeys={["newProjectsRoot"]}
+          {...searchableSetting("new-projects-folder")}
+          description='Where "New project" creates its folder. Leave empty to use the projects folder inside the T3 data directory. "~" means your home directory.'
+          resetAction={
+            settings.newProjectsRoot !== DEFAULT_UNIFIED_SETTINGS.newProjectsRoot ? (
+              <SettingResetButton
+                label="new projects folder"
+                onClick={() =>
+                  updateSettings({ newProjectsRoot: DEFAULT_UNIFIED_SETTINGS.newProjectsRoot })
+                }
+              />
+            ) : null
+          }
+          control={
+            <DraftInput
+              size="sm"
+              className="w-full sm:w-72"
+              value={mixedNewProjectsRoot ? "" : settings.newProjectsRoot}
+              onCommit={(next) => updateSettings({ newProjectsRoot: next })}
+              placeholder={mixedNewProjectsRoot ? "Mixed" : "Default"}
+              spellCheck={false}
+              aria-label="New projects folder"
             />
           }
         />

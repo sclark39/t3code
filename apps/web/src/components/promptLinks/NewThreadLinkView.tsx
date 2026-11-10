@@ -3,6 +3,7 @@ import {
   getAddProjectInitialQuery,
   getCloneDestinationPath,
   getCloneDirectoryPath,
+  resolveNewProjectsRoot,
 } from "@t3tools/client-runtime/operations/projects";
 import {
   findPromptLinkProjects,
@@ -203,7 +204,7 @@ export function NewThreadLinkView({ link }: { readonly link: NewThreadLink }) {
     const environmentId = lastActiveEnvironmentId();
     const environment = environments.find((entry) => entry.environmentId === environmentId);
     const serverConfig = environment?.serverConfig ?? null;
-    const newProjectsRoot = serverConfig?.newProjectsRoot ?? null;
+    const newProjectsRoot = resolveNewProjectsRoot(serverConfig);
     if (environmentId === null || serverConfig === null || newProjectsRoot === null) {
       setState({
         status: "failed",

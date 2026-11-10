@@ -2,9 +2,11 @@ import {
   CommandId,
   type GitManagerServiceError,
   ProjectId,
+  type ServerSettingsError,
   type ThreadId,
   VcsProcessSpawnError,
 } from "@t3tools/contracts";
+import * as HostProcess from "@t3tools/shared/HostProcess";
 import { newProjectFolderName } from "@t3tools/shared/path";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
@@ -22,6 +24,7 @@ import * as Schema from "effect/Schema";
 
 import * as ServerConfig from "../config.ts";
 import * as GitWorkflow from "../git/GitWorkflowService.ts";
+import * as ServerSettings from "../serverSettings.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as ProjectService from "./ProjectService.ts";
 
@@ -97,7 +100,10 @@ export class ManagedProjectFolders extends Context.Service<
       readonly threadId: ThreadId;
       readonly text: string;
     }) => Effect.Effect<Option.Option<string>, ScratchFolderError>;
+    /** The `projects` folder inside the data directory: where named projects go unless a setting says otherwise. */
     readonly namedProjectsRoot: string;
+    /** Where named projects go right now: the `newProjectsRoot` setting when set, else `namedProjectsRoot`. */
+    readonly resolveNamedProjectsRoot: Effect.Effect<string, ServerSettingsError>;
     /** Removes failed/cancelled creations' folders only while no project owns them. */
     readonly createNamedProject: (input: { readonly name: string }) => Effect.Effect<
       {
@@ -201,6 +207,30 @@ const isGitMissing = (error: GitManagerServiceError) =>
   PlatformError.isPlatformError(error.cause.cause) &&
   error.cause.cause.reason._tag === "NotFound";
 
+/**
+ * The folder named projects go in. An empty setting keeps the default, a
+ * leading tilde expands to the home directory, and a relative path resolves
+ * against the process cwd like every other path setting.
+ */
+export function resolveNewProjectsRoot(input: {
+  readonly setting: string;
+  readonly defaultRoot: string;
+  readonly homeDirectory: string;
+  readonly path: Path.Path;
+}): string {
+  const setting = input.setting.trim();
+  if (setting.length === 0) {
+    return input.defaultRoot;
+  }
+  if (setting === "~") {
+    return input.homeDirectory;
+  }
+  if (setting.startsWith("~/") || setting.startsWith("~\\")) {
+    return input.path.resolve(input.homeDirectory, setting.slice(2));
+  }
+  return input.path.resolve(setting);
+}
+
 const make = Effect.gen(function* () {
   const config = yield* ServerConfig.ServerConfig;
   const fileSystem = yield* FileSystem.FileSystem;
@@ -209,6 +239,8 @@ const make = Effect.gen(function* () {
   const git = yield* GitVcsDriver.GitVcsDriver;
   const projects = yield* ProjectService.ProjectService;
   const random = yield* SecureRandom.SecureRandom;
+  const serverSettings = yield* ServerSettings.ServerSettingsService;
+  const homeDirectory = yield* HostProcess.HomeDirectory;
 
   // Non-recursive mkdir atomically claims a name; racers move on after AlreadyExists.
   const claimFreeFolder = Effect.fnUntraced(function* <E>(
@@ -343,34 +375,41 @@ const make = Effect.gen(function* () {
 
   const namedProjectsRoot = path.resolve(config.baseDir, "projects");
 
+  // Read per call rather than once at startup: the setting changes from the
+  // settings page while the server runs, and the next project lands in the new place.
+  const resolveNamedProjectsRoot = serverSettings.getSettings.pipe(
+    Effect.map((settings) =>
+      resolveNewProjectsRoot({
+        setting: settings.newProjectsRoot,
+        defaultRoot: namedProjectsRoot,
+        homeDirectory,
+        path,
+      }),
+    ),
+  );
+
   const claimNamedFolder = Effect.fn("ManagedProjectFolders.claimNamedFolder")(function* (
     name: string,
   ) {
+    const root = yield* resolveNamedProjectsRoot.pipe(
+      Effect.mapError((cause) => new NamedProjectFolderError({ folder: namedProjectsRoot, cause })),
+    );
     yield* fileSystem
-      .makeDirectory(namedProjectsRoot, { recursive: true })
-      .pipe(
-        Effect.mapError(
-          (cause) => new NamedProjectFolderError({ folder: namedProjectsRoot, cause }),
-        ),
-      );
+      .makeDirectory(root, { recursive: true })
+      .pipe(Effect.mapError((cause) => new NamedProjectFolderError({ folder: root, cause })));
     const folderName = newProjectFolderName(name);
     const claimed = yield* claimFreeFolder(
       (attempt) =>
         Effect.succeed(
           attempt > MAX_NAMED_FOLDER_ATTEMPTS
             ? Option.none()
-            : Option.some(
-                path.join(
-                  namedProjectsRoot,
-                  attempt === 1 ? folderName : `${folderName}-${attempt}`,
-                ),
-              ),
+            : Option.some(path.join(root, attempt === 1 ? folderName : `${folderName}-${attempt}`)),
         ),
       (folder, cause) => new NamedProjectFolderError({ folder, cause }),
     );
     if (Option.isSome(claimed)) return claimed.value;
     return yield* new NamedProjectFolderError({
-      folder: path.join(namedProjectsRoot, folderName),
+      folder: path.join(root, folderName),
       cause: `Every folder name for "${folderName}" is taken.`,
     });
   });
@@ -465,6 +504,7 @@ const make = Effect.gen(function* () {
     isScratchProject,
     folderForThread,
     namedProjectsRoot,
+    resolveNamedProjectsRoot,
     createNamedProject,
   });
 });
