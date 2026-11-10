@@ -30,6 +30,24 @@ export function getComposerSubmissionValidationMessage(
     : null;
 }
 
+/**
+ * Enter on an empty composer has nothing to send. While messages wait in the
+ * queue, that keypress sends the oldest one instead, like the steer shortcut.
+ */
+export function isBlankComposerSubmission(input: {
+  readonly prompt: string;
+  readonly hasSendableContent: boolean;
+  readonly answeringPendingUserInput: boolean;
+  readonly editingQueuedMessage: boolean;
+}): boolean {
+  return (
+    !input.answeringPendingUserInput &&
+    !input.editingQueuedMessage &&
+    !input.hasSendableContent &&
+    input.prompt.trim().length === 0
+  );
+}
+
 export function submitComposerDraft(
   options: ComposerSubmissionInput & {
     event: ComposerSubmitEvent | undefined;

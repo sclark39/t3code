@@ -2965,6 +2965,11 @@ export default function ChatView(props: ChatViewProps) {
   };
   const sendPreviewAnnotationStable = useStableCallback(sendPreviewAnnotation);
   const onComposerResumeStable = useStableCallback(onResume);
+  // Enter on an empty composer sends the oldest queued message, like the
+  // steer shortcut, so a queued follow-up can be released without retyping it.
+  const onComposerSubmitBlankStable = useStableCallback(
+    () => routeKind !== "draft" && queuedRunsControlRef.current?.steerNext(false) === true,
+  );
   const onComposerCompactContextStable = useStableCallback(onCompactContext);
   // Read from the projection the footer renders, so the scroll below sees the new message.
   const pendingGuestMessageIds =
@@ -3690,6 +3695,7 @@ export default function ChatView(props: ChatViewProps) {
                                 onPageScrollRelease={onComposerPageScrollReleaseStable}
                                 onCompactContext={onComposerCompactContextStable}
                                 onSend={onComposerSendStable}
+                                onSubmitBlank={onComposerSubmitBlankStable}
                                 onResume={onComposerResumeStable}
                                 onInterrupt={onInterruptStable}
                                 onSelectActivePendingUserInputOption={

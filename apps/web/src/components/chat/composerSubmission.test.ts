@@ -11,7 +11,7 @@ import {
 } from "@t3tools/shared/assistantCitations";
 import { describe, expect, it, vi } from "vite-plus/test";
 
-import { submitComposerDraft } from "./composerSubmission";
+import { isBlankComposerSubmission, submitComposerDraft } from "./composerSubmission";
 
 const assistantCitation = {
   version: 1 as const,
@@ -206,5 +206,28 @@ describe("submitComposerDraft", () => {
 
     expect(result).toEqual({ validationMessage: null, didDispatch: true });
     expect(onSend).toHaveBeenCalledOnce();
+  });
+});
+
+describe("isBlankComposerSubmission", () => {
+  const blank = {
+    prompt: "  \n",
+    hasSendableContent: false,
+    answeringPendingUserInput: false,
+    editingQueuedMessage: false,
+  };
+
+  it("treats whitespace-only text with no attachments as blank", () => {
+    expect(isBlankComposerSubmission(blank)).toBe(true);
+  });
+
+  it("is not blank when the draft has text or attached context", () => {
+    expect(isBlankComposerSubmission({ ...blank, prompt: "Ship it" })).toBe(false);
+    expect(isBlankComposerSubmission({ ...blank, hasSendableContent: true })).toBe(false);
+  });
+
+  it("leaves pending-question answers and queued-message edits alone", () => {
+    expect(isBlankComposerSubmission({ ...blank, answeringPendingUserInput: true })).toBe(false);
+    expect(isBlankComposerSubmission({ ...blank, editingQueuedMessage: true })).toBe(false);
   });
 });
