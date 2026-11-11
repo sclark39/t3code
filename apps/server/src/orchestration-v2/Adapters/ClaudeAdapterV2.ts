@@ -184,6 +184,7 @@ import {
   resolveClaudeConfigDirPath,
   resolveClaudeHomePath,
 } from "../../provider/Drivers/ClaudeHome.ts";
+import { syncClaudeShadowMcpServers } from "../../provider/Drivers/ClaudeSharedMcp.ts";
 import {
   BUNDLED_CLAUDE_MODEL_CATALOG,
   resolveClaudeCatalogContextWindowTokens,
@@ -1765,6 +1766,8 @@ export function makeClaudeQueryOptions(input: {
   readonly sdkSettings?: string | ClaudeSdkSettings;
   readonly environment?: NodeJS.ProcessEnv;
   readonly mcpServers?: ClaudeQueryOptions["mcpServers"];
+  /** The shared home's own servers, registered for a shadow home that cannot see them. */
+  readonly sharedMcpServers?: ClaudeQueryOptions["mcpServers"];
   /** The thread's T3 MCP session holds the `device` capability. */
   readonly deviceToolsAvailable?: boolean;
   readonly tools?: ClaudeAgentSdkQueryTools;
@@ -1883,7 +1886,9 @@ export function makeClaudeQueryOptions(input: {
       ? { pathToClaudeCodeExecutable: input.settings.binaryPath }
       : {}),
     ...(input.environment === undefined ? {} : { env: input.environment }),
-    ...(input.mcpServers === undefined ? {} : { mcpServers: input.mcpServers }),
+    ...(input.mcpServers === undefined && input.sharedMcpServers === undefined
+      ? {}
+      : { mcpServers: { ...input.sharedMcpServers, ...input.mcpServers } }),
     systemPrompt: {
       type: "preset" as const,
       preset: "claude_code" as const,
@@ -10968,6 +10973,14 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             fileSystem,
             path,
           });
+          const sharedMcpServers = (yield* syncClaudeShadowMcpServers(
+            adapterOptions.settings,
+            adapterOptions.environment,
+            turnInput.runtimePolicy.cwd ?? undefined,
+          ).pipe(
+            Effect.provideService(FileSystem.FileSystem, fileSystem),
+            Effect.provideService(Path.Path, path),
+          )) as NonNullable<ClaudeQueryOptions["mcpServers"]>;
           const closedExistingNativeThreadId = existing !== null ? existing.nativeThreadId : null;
           if (existing !== null) {
             yield* existing.query.close.pipe(Effect.ignore);
@@ -11019,6 +11032,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             ...(mcpOverrides.mcpServers === undefined
               ? {}
               : { mcpServers: mcpOverrides.mcpServers }),
+            ...(Object.keys(sharedMcpServers).length === 0 ? {} : { sharedMcpServers }),
             deviceToolsAvailable: mcpSession?.capabilities?.has("device") === true,
             permissionMode: queryPolicy.permissionMode,
             ...(queryPolicy.allowDangerouslySkipPermissions === undefined

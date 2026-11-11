@@ -62,7 +62,18 @@ mklink %USERPROFILE%\.claude_personal\settings.json %USERPROFILE%\.claude\settin
 ```
 
 Never link `.credentials.json` or `.claude.json` — separate credentials are the
-point. If you instead put the account directory in **CLAUDE_CONFIG_DIR path** with
+point.
+
+MCP servers are shared for you. Claude Code saves them in `.claude.json`, so a
+server added under one account would otherwise be missing for the other. Each
+time T3 Code starts a Claude session on a shadow home, it moves any MCP servers
+it finds in that shadow's `.claude.json` into the shared home's, then gives the
+session the shared home's servers. When both define a server with the same name,
+the shared home's definition is kept. This applies to sessions T3 Code starts; a
+`claude` you run yourself against a shadow directory sees only that directory's
+servers. Each account still signs in to a server separately.
+
+If you instead put the account directory in **CLAUDE_CONFIG_DIR path** with
 no shadow home, that instance stays a separate Claude environment, isolated
 including its local conversation state, and the picker will not offer it for an
 existing thread.
