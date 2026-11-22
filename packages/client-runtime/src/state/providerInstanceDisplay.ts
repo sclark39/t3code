@@ -43,6 +43,44 @@ export function providerInstanceInitials(label: string): string {
     .join("");
 }
 
+const PROVIDER_INSTANCE_INITIALS_MAX_CHARS = 4;
+
+export function normalizeProviderInstanceInitials(value: string | undefined): string | undefined {
+  const initials = Array.from(value?.trim() ?? "")
+    .slice(0, PROVIDER_INSTANCE_INITIALS_MAX_CHARS)
+    .join("")
+    .trim();
+  return initials || undefined;
+}
+
+interface ProviderInstanceLook {
+  readonly initials: string | undefined;
+  readonly icon: string | undefined;
+}
+
+export const providerInstanceLookKey = (driver: string, displayName: string): string =>
+  `${driver}:${displayName}`;
+
+/** Icons are drawn from a driver and a display name, so that pair is what finds a look. */
+export function providerInstanceLooks(
+  providers: Iterable<
+    Pick<ServerProvider, "instanceId" | "driver" | "displayName" | "initials" | "icon">
+  >,
+): ReadonlyMap<string, ProviderInstanceLook> {
+  const looks = new Map<string, ProviderInstanceLook>();
+  for (const provider of providers) {
+    const initials = normalizeProviderInstanceInitials(provider.initials);
+    const icon = provider.icon?.trim() || undefined;
+    if (initials === undefined && icon === undefined) continue;
+    const key = providerInstanceLookKey(
+      provider.driver,
+      resolveProviderInstanceDisplayName(provider),
+    );
+    if (!looks.has(key)) looks.set(key, { initials, icon });
+  }
+  return looks;
+}
+
 export function normalizeProviderAccentColor(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   if (!trimmed) return undefined;

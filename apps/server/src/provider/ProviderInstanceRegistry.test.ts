@@ -347,6 +347,8 @@ describe("ProviderInstanceRegistry — multi-instance codex slice", () => {
         [staleId]: {
           driver: ProviderDriverKind.make("codex"),
           enabled: true,
+          initials: "WORK",
+          icon: "rocket",
           config: makeCodexConfig({ enabled: false }),
         },
       };
@@ -361,6 +363,7 @@ describe("ProviderInstanceRegistry — multi-instance codex slice", () => {
       expect(instance!.enabled).toBe(false);
       const snapshot = yield* instance!.snapshot.getSnapshot;
       expect(snapshot.enabled).toBe(false);
+      expect(snapshot).toMatchObject({ initials: "WORK", icon: "rocket" });
     }).pipe(Effect.provide(layerTest)),
   );
 
@@ -370,13 +373,14 @@ describe("ProviderInstanceRegistry — multi-instance codex slice", () => {
       const reason = "Example Corp's policy does not allow the Codex provider.";
       const { registry } = yield* makeProviderInstanceRegistry({
         drivers: [CodexDriver],
-        configMap: { [instanceId]: { driver: ProviderDriverKind.make("codex") } },
+        configMap: { [instanceId]: { driver: ProviderDriverKind.make("codex"), initials: "WORK" } },
         blockedReason: (driver) => (driver === "codex" ? reason : undefined),
       });
 
       expect(yield* registry.getInstance(instanceId)).toBeUndefined();
       const [unavailable] = yield* registry.listUnavailable;
       expect(unavailable?.instanceId).toBe(instanceId);
+      expect(unavailable?.initials).toBe("WORK");
       expect(unavailable?.availability).toBe("unavailable");
       expect(unavailable?.unavailableReason).toBe(reason);
     }).pipe(Effect.provide(layerTest)),

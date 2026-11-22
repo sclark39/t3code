@@ -1,10 +1,13 @@
-import { ProviderDriverKind } from "@t3tools/contracts";
+import { ProviderDriverKind, ProviderInstanceId } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
   normalizeProviderAccentColor,
+  normalizeProviderInstanceInitials,
   providerAccentForegroundColor,
   providerInstanceInitials,
+  providerInstanceLookKey,
+  providerInstanceLooks,
   shouldShowInstanceBadge,
 } from "./providerInstanceDisplay.ts";
 
@@ -24,6 +27,33 @@ describe("providerInstanceInitials", () => {
   it("keeps an emoji whole instead of splitting its surrogate pair", () => {
     expect(providerInstanceInitials("😀 Work")).toBe("😀W");
     expect(providerInstanceInitials("😀")).toBe("😀");
+  });
+});
+
+describe("normalizeProviderInstanceInitials", () => {
+  it("keeps at most four characters, counting an emoji as one", () => {
+    expect(normalizeProviderInstanceInitials(" Ross1 ")).toBe("Ross");
+    expect(normalizeProviderInstanceInitials("😀work")).toBe("😀wor");
+    expect(normalizeProviderInstanceInitials("  ")).toBeUndefined();
+  });
+});
+
+describe("providerInstanceLooks", () => {
+  it("finds a look by driver and resolved display name, skipping instances without one", () => {
+    const looks = providerInstanceLooks([
+      { instanceId: ProviderInstanceId.make("codex"), driver: codex },
+      {
+        instanceId: ProviderInstanceId.make("codex_work"),
+        driver: codex,
+        initials: "WORK",
+        icon: "rocket",
+      },
+    ]);
+    expect(looks.get(providerInstanceLookKey(codex, "Codex Work"))).toEqual({
+      initials: "WORK",
+      icon: "rocket",
+    });
+    expect(looks.size).toBe(1);
   });
 });
 

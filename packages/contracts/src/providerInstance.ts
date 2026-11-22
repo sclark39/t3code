@@ -76,6 +76,10 @@ export const ProviderInstanceConfig = Schema.Struct({
   driver: ProviderDriverKind,
   displayName: Schema.optional(TrimmedNonEmptyString),
   accentColor: Schema.optional(TrimmedNonEmptyString),
+  /** Badge letters shown in place of the ones derived from the display name. */
+  initials: Schema.optional(TrimmedNonEmptyString),
+  /** "tinted" draws the provider's logo in the accent color; any other value names a glyph. */
+  icon: Schema.optional(TrimmedNonEmptyString),
   environment: Schema.optionalKey(ProviderInstanceEnvironment),
   enabled: Schema.optionalKey(Schema.Boolean),
   config: Schema.optionalKey(Schema.Unknown),

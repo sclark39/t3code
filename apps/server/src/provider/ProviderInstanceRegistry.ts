@@ -69,6 +69,38 @@ interface RegistryState {
 const entryEqual = (a: ProviderInstanceConfig, b: ProviderInstanceConfig): boolean =>
   Equal.equals(a, b);
 
+const withInstanceLook = (
+  snapshot: ServerProvider,
+  entry: ProviderInstanceConfig,
+): ServerProvider => ({
+  ...snapshot,
+  ...(entry.initials ? { initials: entry.initials } : {}),
+  ...(entry.icon ? { icon: entry.icon } : {}),
+});
+
+// Drivers build their own snapshots; the look is added here so no driver has to carry it.
+const withLookOnSnapshots = (
+  instance: ProviderInstance,
+  entry: ProviderInstanceConfig,
+): ProviderInstance =>
+  entry.initials === undefined && entry.icon === undefined
+    ? instance
+    : {
+        ...instance,
+        snapshot: {
+          ...instance.snapshot,
+          getSnapshot: Effect.map(instance.snapshot.getSnapshot, (snapshot) =>
+            withInstanceLook(snapshot, entry),
+          ),
+          refresh: Effect.map(instance.snapshot.refresh, (snapshot) =>
+            withInstanceLook(snapshot, entry),
+          ),
+          streamChanges: Stream.map(instance.snapshot.streamChanges, (snapshot) =>
+            withInstanceLook(snapshot, entry),
+          ),
+        },
+      };
+
 const secretReferencesIn = (environment: ProviderInstanceEnvironment): Array<SecretReference> =>
   environment.flatMap((variable) => (typeof variable.value === "string" ? [] : [variable.value]));
 
@@ -294,7 +326,7 @@ const buildEntry = Effect.fn("ProviderInstanceRegistry.buildEntry")(function* <R
   return {
     kind: "live" as const,
     live: {
-      instance: createResult.success,
+      instance: withLookOnSnapshots(createResult.success, entry),
       scope: childScope,
       entry,
       secrets,
@@ -410,7 +442,7 @@ const makeReconcile = <R>(input: {
         if (result.kind === "live") {
           builtEntries.set(instanceId, result.live);
         } else {
-          builtUnavailable.set(instanceId, result.snapshot);
+          builtUnavailable.set(instanceId, withInstanceLook(result.snapshot, entry));
           if (result.secretsUnreadable) builtSecretsUnreadable.set(instanceId, entry);
         }
       }

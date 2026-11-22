@@ -2,6 +2,7 @@ import { type CSSProperties, memo } from "react";
 
 import {
   normalizeProviderAccentColor,
+  normalizeProviderInstanceInitials,
   providerAccentForegroundColor,
   providerInstanceInitials,
 } from "@t3tools/client-runtime/state/provider-instance-display";
@@ -20,6 +21,11 @@ import {
 import { cn } from "~/lib/utils";
 import { providerClients } from "../settings/providerDriverMeta";
 import { ProviderPackageIcon } from "./ProviderPackageIcon";
+import {
+  PROVIDER_INSTANCE_GLYPHS,
+  TINTED_PROVIDER_LOGO,
+  useProviderInstanceLook,
+} from "./providerInstanceLook";
 import {
   AcpRegistryAgentIcon,
   officialAcpRegistryIconUrlForAgentId,
@@ -90,6 +96,9 @@ export const ProviderInstanceIcon = memo(function ProviderInstanceIcon(props: {
   driverKind: ProviderDriverKind;
   displayName: string;
   accentColor?: string | undefined;
+  /** Given, even empty, these replace the look found by driver and display name. */
+  initials?: string | undefined;
+  icon?: string | undefined;
   acpRegistryAgentId?: string | undefined;
   acpRegistryIconUrl?: string | undefined;
   showBadge?: boolean;
@@ -111,7 +120,19 @@ export const ProviderInstanceIcon = memo(function ProviderInstanceIcon(props: {
       } as CSSProperties)
     : undefined;
   const badgeContent = props.badgeContent ?? "initials";
-  const iconClassName = cn(props.size === "compact" && "size-3.5", props.iconClassName);
+  const look = useProviderInstanceLook(props.driverKind, props.displayName);
+  const initials =
+    normalizeProviderInstanceInitials(props.initials ?? look.initials) ??
+    providerInstanceInitials(props.displayName);
+  const icon = props.icon ?? look.icon;
+  const Glyph = icon === undefined ? undefined : PROVIDER_INSTANCE_GLYPHS.get(icon)?.Icon;
+  const iconClassName = cn(
+    props.size === "compact" && "size-3.5",
+    props.iconClassName,
+    accentColor &&
+      icon === TINTED_PROVIDER_LOGO &&
+      "fill-(--provider-accent) text-(--provider-accent) dark:fill-(--provider-accent)",
+  );
   const isAcpRegistry = props.driverKind === "acpRegistry";
   // A custom OpenAI-compatible endpoint has no brand: show its name, marked with the protocol.
   const isCustomEndpoint = props.driverKind === "openaiCompatible";
@@ -130,7 +151,16 @@ export const ProviderInstanceIcon = memo(function ProviderInstanceIcon(props: {
       style={accentStyle}
       data-provider-accent-color={accentColor}
     >
-      {isAcpRegistry ? (
+      {Glyph ? (
+        <Glyph
+          className={cn(
+            "size-5 shrink-0",
+            iconClassName,
+            accentColor && "text-(--provider-accent)",
+          )}
+          aria-hidden
+        />
+      ) : isAcpRegistry ? (
         <AcpRegistryAgentIcon
           className={cn("size-5 rounded-none bg-transparent", iconClassName)}
           fallbackClassName="size-full"
@@ -145,10 +175,8 @@ export const ProviderInstanceIcon = memo(function ProviderInstanceIcon(props: {
           )}
           aria-hidden
         >
-          {Array.from(providerInstanceInitials(props.displayName))[0]}
-          <span className="@max-[1.1rem]:hidden">
-            {Array.from(providerInstanceInitials(props.displayName)).slice(1).join("")}
-          </span>
+          {Array.from(initials)[0]}
+          <span className="@max-[1.1rem]:hidden">{Array.from(initials).slice(1).join("")}</span>
           <span
             className={cn(
               "pointer-events-none absolute right-[-0.3125rem] bottom-[-0.3125rem] z-10 flex size-3 items-center justify-center rounded-full border bg-card text-foreground shadow-sm @max-[1.1rem]:hidden",
@@ -168,11 +196,9 @@ export const ProviderInstanceIcon = memo(function ProviderInstanceIcon(props: {
       ) : Icon ? (
         <Icon className={cn("size-5 shrink-0", iconClassName)} aria-hidden />
       ) : (
-        <span className={cn("text-3xs font-semibold leading-none", iconClassName)}>
-          {providerInstanceInitials(props.displayName)}
-        </span>
+        <span className={cn("text-3xs font-semibold leading-none", iconClassName)}>{initials}</span>
       )}
-      {isCustomEndpoint ? null : props.showBadge ? (
+      {isCustomEndpoint && !Glyph ? null : props.showBadge ? (
         <span
           className={cn(
             "pointer-events-none absolute right-0 bottom-0 z-10 flex h-3.5 min-w-3.5 items-center justify-center rounded-full border px-0.5 text-4xs font-semibold leading-none shadow-sm",
@@ -186,7 +212,7 @@ export const ProviderInstanceIcon = memo(function ProviderInstanceIcon(props: {
           style={{ borderColor: indicatorBackground }}
           aria-hidden
         >
-          {badgeContent === "initials" ? providerInstanceInitials(props.displayName) : null}
+          {badgeContent === "initials" ? initials : null}
         </span>
       ) : null}
     </span>

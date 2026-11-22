@@ -39,6 +39,10 @@ import {
 import { cn } from "../../lib/utils";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { useStableCallback } from "../../hooks/useStableCallback";
+import {
+  normalizeProviderInstanceInitials,
+  providerInstanceInitials,
+} from "@t3tools/client-runtime/state/provider-instance-display";
 import { normalizeProviderAccentColor } from "../../providerInstances";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -65,6 +69,7 @@ import {
 import { ProviderModelsSection } from "./ProviderModelsSection";
 import { ProviderInstanceIcon } from "../chat/ProviderInstanceIcon";
 import { ProviderAccentColorPicker } from "./ProviderAccentColorPicker";
+import { ProviderInstanceIconPicker } from "./ProviderInstanceIconPicker";
 import { RedactedSensitiveText } from "./RedactedSensitiveText";
 import { SettingResetButton, SettingsRow, SettingsSection } from "./settingsLayout";
 import { AcpSessionManagementSection } from "./AcpSessionManagementSection";
@@ -854,6 +859,11 @@ export function ProviderInstanceCard({
     );
   };
 
+  const updateLook = (field: "initials" | "icon", value: string | undefined) => {
+    const { [field]: _omit, ...rest } = instance;
+    onUpdate((value ? { ...rest, [field]: value } : rest) as ProviderInstanceConfig);
+  };
+
   const updateConfig = (nextConfig: Record<string, unknown> | undefined) => {
     const { config: _omit, ...rest } = instance;
     onUpdate(
@@ -909,11 +919,14 @@ export function ProviderInstanceCard({
     updateEnvironment(providerEnvironmentWithoutNames(instance.environment, new Set([field.name])));
   };
 
-  const titleIconNode = (
+  // The stored look is passed outright: the one found by display name lags an edit made here.
+  const renderInstanceIcon = (icon: string, showBadge: boolean) => (
     <ProviderInstanceIcon
       driverKind={driverKind ?? instance.driver}
       displayName={displayName}
       accentColor={accentColor}
+      initials={instance.initials ?? ""}
+      icon={icon}
       acpRegistryAgentId={
         readConfigString(instance.config, "source") === "local"
           ? undefined
@@ -924,11 +937,15 @@ export function ProviderInstanceCard({
           ? undefined
           : (readConfigString(instance.config, "registryIconUrl") ?? undefined)
       }
-      showBadge={Boolean(accentColor)}
+      showBadge={showBadge}
       className="size-5"
       iconClassName="size-4 text-foreground/80"
       badgeClassName="right-[-0.125rem] bottom-[-0.125rem] h-3 min-w-3 px-0.5 text-5xs"
     />
+  );
+  const titleIconNode = renderInstanceIcon(
+    instance.icon ?? "",
+    Boolean(accentColor) || instance.initials !== undefined,
   );
 
   const titleTailNode = headerAction ? (
@@ -1280,6 +1297,24 @@ export function ProviderInstanceCard({
                 displayName={displayName}
                 value={accentColor}
                 onCommit={updateAccentColor}
+              />
+              <ProviderInstanceIconPicker
+                displayName={displayName}
+                value={instance.icon}
+                renderIcon={(icon) => renderInstanceIcon(icon, false)}
+                onCommit={(icon) => updateLook("icon", icon)}
+              />
+              <DraftInput
+                id={`provider-instance-${instanceId}-initials`}
+                size="sm"
+                className="w-16 shrink-0"
+                value={instance.initials ?? ""}
+                onCommit={(value) =>
+                  updateLook("initials", normalizeProviderInstanceInitials(value))
+                }
+                placeholder={providerInstanceInitials(displayName)}
+                aria-label={`Badge letters for ${displayName}`}
+                spellCheck={false}
               />
               <DraftInput
                 id={`provider-instance-${instanceId}-display-name`}
