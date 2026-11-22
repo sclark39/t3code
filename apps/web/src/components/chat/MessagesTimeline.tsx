@@ -490,6 +490,18 @@ const ConversationTimeline = memo(function ConversationTimeline({
   };
   const onToggleWorkGroup = (groupId: string, anchorKey: string) => {
     preserveDisclosurePosition(anchorKey);
+    // An open group of only thoughts shows each in full, so closing it closes them.
+    const openThoughts = expandedWorkGroupIds.has(groupId)
+      ? rows.find((row) => row.id === `${groupId}:details`)
+      : undefined;
+    if (
+      openThoughts?.kind === "work" &&
+      openThoughts.groupedEntries.every((entry) => entry.itemType === "reasoning")
+    ) {
+      for (const entry of openThoughts.groupedEntries) {
+        workGroupViewState.expandedEntries.delete(entry.id);
+      }
+    }
     setExpandedWorkGroupIds((existing) => {
       const next = new Set(existing);
       if (next.has(groupId)) {
@@ -513,7 +525,8 @@ const ConversationTimeline = memo(function ConversationTimeline({
     });
   };
 
-  // An interrupted run opens its fold; a newer run closes the previous run's.
+  // An interrupted run opens its fold, as does a finished one holding an entry the reader has
+  // open; a newer run closes the previous run's.
   const [observedLatestRun, setObservedLatestRun] = useState({
     identity: listIdentityKey,
     runId: latestRun?.runId,
@@ -536,7 +549,18 @@ const ConversationTimeline = memo(function ConversationTimeline({
       previousRunId !== undefined
     ) {
       if (latestRun.runId === previousRunId) {
-        if (observedLatestRun.status === "running" && latestRun.status === "interrupted") {
+        const keepsOpenEntry =
+          latestRun.status === "completed" &&
+          timelineEntries.some(
+            (entry) =>
+              entry.kind === "work" &&
+              entry.entry.runId === latestRun.runId &&
+              workGroupViewState.expandedEntries.has(entry.entry.id),
+          );
+        if (
+          observedLatestRun.status === "running" &&
+          (latestRun.status === "interrupted" || keepsOpenEntry)
+        ) {
           setExpandedRunIds((existing) => new Set(existing).add(latestRun.runId));
         }
       } else {

@@ -186,18 +186,14 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
       ? notificationChildThreadId(workEntry.projectedItem.item.source)
       : undefined;
   const groupView = use(WorkGroupViewCtx);
-  const [expanded, setExpanded] = useState(
-    () => groupView?.state.expandedEntries.has(workEntry.id) ?? false,
-  );
+  // Open entries are kept per thread, so one stays open when it moves between a group and a row of its own.
+  const openEntries = ctx.workGroupViewState.expandedEntries;
+  const [expanded, setExpanded] = useState(() => openEntries.has(workEntry.id));
   const toggleExpanded = () => {
     const next = !expanded;
-    if (groupView) {
-      groupView.onToggleEntry(!next);
-      if (next) groupView.state.expandedEntries.add(workEntry.id);
-      else groupView.state.expandedEntries.delete(workEntry.id);
-    } else {
-      props.onToggleEntry?.(!next);
-    }
+    (groupView?.onToggleEntry ?? props.onToggleEntry)?.(!next);
+    if (next) openEntries.add(workEntry.id);
+    else openEntries.delete(workEntry.id);
     setExpanded(next);
   };
   const failureItem = workEntry.projectedItem?.item;

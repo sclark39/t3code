@@ -359,6 +359,84 @@ describe("MessagesTimeline work rows", () => {
     await vi.waitFor(() => expect(distanceFromEnd()).toBeLessThan(2));
   });
 
+  it.each([
+    ["a tool call", "open"],
+    ["the answer", "open"],
+    ["the answer", "closed"],
+  ] as const)(
+    "leaves a live thought followed by %s %s, as the reader had it",
+    async (next, state) => {
+      const runId = RunId.make("thinking-run");
+      const prompt = message("Go");
+      const thought = (toolLifecycleStatus: string) =>
+        work("thought", {
+          runId,
+          label: "Thinking",
+          tone: "thinking",
+          itemType: "reasoning",
+          detail: "## Plan\n\nRead the timeline",
+          toolLifecycleStatus,
+        });
+      const tool = (toolLifecycleStatus: string) =>
+        work("tool", {
+          runId,
+          label: "Ran rg",
+          tone: "tool",
+          itemType: "command_execution",
+          command: "rg plan",
+          requestKind: "command",
+          toolLifecycleStatus,
+        });
+      const answer = (streaming: boolean) =>
+        message("Done", { role: "assistant", runId, streaming }, "answer");
+      const props = baseProps();
+      const timeline = (entries: Entry[], working = true) => (
+        <MessagesTimeline
+          {...props}
+          timelineEntries={entries}
+          isWorking={working}
+          activeTurnStartedAt={working ? CREATED_AT : null}
+          latestRun={{
+            runId,
+            status: working ? "running" : "completed",
+            startedAt: CREATED_AT,
+            completedAt: working ? null : CREATED_AT,
+          }}
+        />
+      );
+      await using screen = await renderElement(timeline([prompt, thought("inProgress")]));
+      const plan = screen.getByRole("heading", { name: "Plan" });
+      const expectThought = () =>
+        state === "open"
+          ? expect.element(plan).toBeVisible()
+          : expect.element(plan).not.toBeInTheDocument();
+      const liveThought = screen.button(/Thinking/);
+      await click(liveThought);
+      await expect.element(plan).toBeVisible();
+      if (state === "closed") await click(liveThought);
+      await screen.rerender(
+        timeline([
+          prompt,
+          thought("completed"),
+          next === "the answer" ? answer(true) : tool("inProgress"),
+        ]),
+      );
+      await expectThought();
+      await screen.rerender(
+        timeline(
+          [
+            prompt,
+            thought("completed"),
+            ...(next === "the answer" ? [] : [tool("completed")]),
+            answer(false),
+          ],
+          false,
+        ),
+      );
+      await expectThought();
+    },
+  );
+
   it.each(["delegated", "legacy", "missing"] as const)(
     "uses the reported task for %s completion notifications",
     async (source) => {

@@ -68,7 +68,7 @@ export const WorkGroupSection = memo(function WorkGroupSection({
   isExpandedToolGroup: boolean;
   displayLabel?: string | undefined;
 }) {
-  const { workspaceRoot, routeThreadKey, onToggleWorkEntry, pendingApprovals } =
+  const { workspaceRoot, routeThreadKey, onToggleWorkEntry, pendingApprovals, workGroupViewState } =
     use(TimelineRowCtx);
   const onToggleStandaloneEntry = (collapsed: boolean) =>
     onToggleWorkEntry(disclosureAnchorKey, collapsed);
@@ -79,9 +79,16 @@ export const WorkGroupSection = memo(function WorkGroupSection({
       workEntryIsVisibleInGroup(entry, isExpandedToolGroup)
     );
   });
+  const showsThoughtsInFull =
+    isExpandedToolGroup && nonEmptyEntries.every((entry) => entry.itemType === "reasoning");
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- records the thoughts shown in full in the view state kept outside React, so each stays open once it gets a row of its own
+  useLayoutEffect(() => {
+    if (!showsThoughtsInFull) return;
+    for (const entry of nonEmptyEntries) workGroupViewState.expandedEntries.add(entry.id);
+  }, [showsThoughtsInFull, nonEmptyEntries, workGroupViewState]);
 
   if (nonEmptyEntries.length === 0) return null;
-  if (isExpandedToolGroup && nonEmptyEntries.every((entry) => entry.itemType === "reasoning")) {
+  if (showsThoughtsInFull) {
     return <ReasoningTraceContent entries={nonEmptyEntries} />;
   }
   if (isExpandedToolGroup) {
@@ -154,7 +161,6 @@ function ExpandedWorkGroupEntries({
   }
 
   const groupView = {
-    state: viewState,
     onToggleEntry: (collapsed: boolean) => onToggleWorkEntry(disclosureAnchorKey, collapsed),
   };
   const updateScrollFades = () => {
